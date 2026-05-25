@@ -16,7 +16,9 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+import { signInWithRedirect, getRedirectResult } from "firebase/auth";
+export const signInWithGoogle = () => signInWithRedirect(auth, googleProvider);
+export const getGoogleRedirectResult = () => getRedirectResult(auth);
 export const logOut = () => signOut(auth);
 export const onAuthChange = (cb) => onAuthStateChanged(auth, cb);
 
