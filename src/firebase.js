@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCbeqleqo-dR9mU1A0108SY-3QmuFSEJ74",
@@ -12,12 +11,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-
-export const signInWithEmail = (email, pass) => signInWithEmailAndPassword(auth, email, pass);
-export const logOut = () => signOut(auth);
-export const onAuthChange = (cb) => onAuthStateChanged(auth, cb);
+const db = getFirestore(app);
 
 export const loadData = async () => {
   try {
