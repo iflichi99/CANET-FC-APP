@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCbeqleqo-dR9mU1A0108SY-3QmuFSEJ74",
@@ -14,11 +14,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
 
-import { signInWithRedirect, getRedirectResult } from "firebase/auth";
-export const signInWithGoogle = () => signInWithRedirect(auth, googleProvider);
-export const getGoogleRedirectResult = () => getRedirectResult(auth);
+export const signInWithEmail = (email, pass) => signInWithEmailAndPassword(auth, email, pass);
 export const logOut = () => signOut(auth);
 export const onAuthChange = (cb) => onAuthStateChanged(auth, cb);
 
