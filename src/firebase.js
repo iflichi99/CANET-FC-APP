@@ -15,22 +15,17 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Auto-authenticate anonymously on load
-let authReady = false;
+// Auto-authenticate anonymously — with 3s timeout fallback
 const authPromise = new Promise((resolve) => {
+  const timeout = setTimeout(() => resolve(null), 3000);
   onAuthStateChanged(auth, (user) => {
-    if (user) {
-      authReady = true;
-      resolve(user);
-    } else {
-      signInAnonymously(auth).catch(console.error);
-    }
+    if (user) { clearTimeout(timeout); resolve(user); }
+    else { signInAnonymously(auth).catch(() => { clearTimeout(timeout); resolve(null); }); }
   });
 });
 
-const waitForAuth = () => authReady ? Promise.resolve() : authPromise;
+const waitForAuth = () => authPromise;
 
-// Load all teams - each team in its own document
 export const loadData = async () => {
   try {
     await waitForAuth();
@@ -41,7 +36,6 @@ export const loadData = async () => {
       teams.sort((a, b) => (a.id || "").localeCompare(b.id || ""));
       if (teams.length > 0) return teams;
     }
-    // Fallback to old single document
     const old = await getDoc(doc(db, "club", "canet_v4"));
     if (old.exists()) return old.data().teams;
     return null;
@@ -51,7 +45,6 @@ export const loadData = async () => {
   }
 };
 
-// Save all teams - each in its own document
 export const saveData = async (teams) => {
   try {
     await waitForAuth();
@@ -63,9 +56,7 @@ export const saveData = async (teams) => {
     await batch.commit();
   } catch (e) {
     console.error("Save error:", e);
-    // Fallback
     try {
-      await waitForAuth();
       await setDoc(doc(db, "club", "canet_v4"), { teams });
     } catch (e2) {
       console.error("Fallback save error:", e2);
