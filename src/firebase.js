@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc, getDocs, collection, writeBatch } from "firebase/firestore";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { getFirestore, doc, getDoc, setDoc, getDocs, deleteDoc, collection, writeBatch } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCbeqleqo-dR9mU1A0108SY-3QmuFSEJ74",
@@ -13,53 +12,74 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app);
 
-// Auto-authenticate anonymously — with 3s timeout fallback
-const authPromise = new Promise((resolve) => {
-  const timeout = setTimeout(() => resolve(null), 3000);
-  onAuthStateChanged(auth, (user) => {
-    if (user) { clearTimeout(timeout); resolve(user); }
-    else { signInAnonymously(auth).catch(() => { clearTimeout(timeout); resolve(null); }); }
-  });
-});
-
-const waitForAuth = () => authPromise;
+let migratedOldData = false;
 
 export const loadData = async () => {
   try {
-    await waitForAuth();
+    // Always try new per-team collection first
     const snap = await getDocs(collection(db, "teams"));
     if (!snap.empty) {
       const teams = [];
       snap.forEach(d => teams.push(d.data()));
       teams.sort((a, b) => (a.id || "").localeCompare(b.id || ""));
-      if (teams.length > 0) return teams;
+      if (teams.length > 0) {
+        migratedOldData = true;
+        return teams;
+      }
     }
-    const old = await getDoc(doc(db, "club", "canet_v4"));
-    if (old.exists()) return old.data().teams;
+    // Only fallback to old doc if no teams collection exists yet
+    if (!migratedOldData) {
+      const old = await getDoc(doc(db, "club", "canet_v4"));
+      if (old.exists()) {
+        const teams = old.data().teams;
+        // Migrate: save each team to its own document
+        if (teams && teams.length > 0) {
+          await saveData(teams);
+          migratedOldData = true;
+        }
+        return teams;
+      }
+    }
     return null;
   } catch (e) {
     console.error("Load error:", e);
+    // Offline fallback
+    const cached = localStorage.getItem("canet_offline_cache");
+    if (cached) try { return JSON.parse(cached); } catch {}
     return null;
   }
 };
 
 export const saveData = async (teams) => {
   try {
-    await waitForAuth();
+    // Save to localStorage as offline cache
+    localStorage.setItem("canet_offline_cache", JSON.stringify(teams));
+    
+    // Get existing team IDs to detect deletions
+    const existing = await getDocs(collection(db, "teams"));
+    const existingIds = new Set();
+    existing.forEach(d => existingIds.add(d.id));
+    
+    const newIds = new Set(teams.map(t => t.id));
+    
     const batch = writeBatch(db);
+    
+    // Save/update all current teams
     teams.forEach(team => {
       const ref = doc(db, "teams", team.id);
       batch.set(ref, team);
     });
+    
+    // Delete removed teams
+    existingIds.forEach(id => {
+      if (!newIds.has(id)) {
+        batch.delete(doc(db, "teams", id));
+      }
+    });
+    
     await batch.commit();
   } catch (e) {
     console.error("Save error:", e);
-    try {
-      await setDoc(doc(db, "club", "canet_v4"), { teams });
-    } catch (e2) {
-      console.error("Fallback save error:", e2);
-    }
   }
 };
